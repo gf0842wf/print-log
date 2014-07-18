@@ -8,6 +8,12 @@
 
 ### Usage ###
 
+支持日志级别: 在print开头添加下面字段即可
+
+    Error, Warn, Debug, Info 
+    对应
+    !(E),  +(W), =(D),  -(I)
+
 `demo.py`
 
     # -*- coding: utf-8 -*-
@@ -15,7 +21,7 @@
     from log import start_logging
     import gevent
     
-    start_logging("test.log", timefmt="%Y-%d-%m %X")
+    start_logging("test.log", timefmt="%Y-%d-%m %X", level="+")
     
     print "!", "abcdef", "12345"
     print "+ghighk", "34343"
@@ -27,8 +33,5 @@
 
 `test.log`
 
-    [E][2014-18-07 12:32:15] ! abcdef 12345
-    [W][2014-18-07 12:32:15] +ghighk 34343
-    [D][2014-18-07 12:32:15] Dhahaha 67676
-    [I][2014-18-07 12:32:15] I ooxxx 88989
-    [-][2014-18-07 12:32:15] xyzufo 88989
+    [E][2014-18-07 13:18:47] abcdef 12345
+    [W][2014-18-07 13:18:47] ghighk 34343
