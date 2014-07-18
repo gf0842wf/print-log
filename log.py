@@ -51,31 +51,42 @@ class Stdio(object):
 class LogManager(object):
     """gevent的log循环"""
     # 级别: Error, Warn, Debug, Info
-    levels = {"!":"E", "+":"W", "=":"D", "-":"I",
-             "E":"E", "W":"W", "D":"D", "I":"I",}
+    # 默认是Debug级别
+    levels = {"E":4, "W":3, "D":2, "I":1, "-":2}
+    levels2a = {"!":"E", "+":"W", "=":"D", "-":"I",
+                "E":"E", "W":"W", "D":"D", "I":"I"}
     
-    def __init__(self, filename, queue, timefmt="%Y-%d-%m %X"):
+    def __init__(self, filename, queue, timefmt="%Y-%d-%m %X", level="="):
         self.filename = filename
         self.queue = queue
         self.timefmt = timefmt
+        self.sys_level_value = self.levels[self.levels2a.get(level, "D")]
         self.gth_loop = gevent.spawn(self.loop)
         
     def loop(self):
         while True:
             msg = self.queue.get()
-            if msg: level = self.levels.get(msg[0], "-")
+            if msg:
+                msg_level = msg[0]
+                msg_level = self.levels2a.get(msg_level, "-")
+                level_value = self.levels.get(msg_level)
             else: continue
-            prefix = "[{0}][{1}] ".format(level, time.strftime(self.timefmt))
+            if level_value < self.sys_level_value: continue
+            prefix = "[{0}][{1}] ".format(msg_level, time.strftime(self.timefmt))
             with open(self.filename, "a+") as f:
+                if msg_level != "-" and len(msg) > 1:
+                    msg = msg[1:]
+                    msg = msg.lstrip(" ")
                 line = prefix + msg + "\n"
                 f.write(line)
                 
-def start_logging(filename=None, timefmt="%Y-%d-%m %X", encoding=None):
+                
+def start_logging(filename=None, timefmt="%Y-%d-%m %X", level="=", encoding=None):
     """全局函数,启动日志"""
     if not filename: return "sys.stdout"
     queue = Queue()
     stdout = Stdio(queue=queue, encoding=encoding)
-    manager = LogManager(filename, queue)
+    manager = LogManager(filename, queue, timefmt, level)
     sys.stdout = stdout
     return filename
 
