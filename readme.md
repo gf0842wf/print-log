@@ -7,3 +7,28 @@
 
 
 ### Usage ###
+
+`demo.py`
+
+    # -*- coding: utf-8 -*-
+    
+    from log import start_logging
+    import gevent
+    
+    start_logging("test.log", timefmt="%Y-%d-%m %X")
+    
+    print "!", "abcdef", "12345"
+    print "+ghighk", "34343"
+    print "Dhahaha", "67676"
+    print "I", "ooxxx", "88989"
+    print "xyzufo", "88989"
+            
+    gevent.wait()
+
+`test.log`
+
+    [E][2014-18-07 12:32:15] ! abcdef 12345
+    [W][2014-18-07 12:32:15] +ghighk 34343
+    [D][2014-18-07 12:32:15] Dhahaha 67676
+    [I][2014-18-07 12:32:15] I ooxxx 88989
+    [-][2014-18-07 12:32:15] xyzufo 88989
