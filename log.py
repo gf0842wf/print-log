@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from gevent.queue import Queue
-import sys, time, os
+from os.path import getsize
+import sys, time, os, shutil
 import gevent
 
 
@@ -56,12 +57,20 @@ class LogManager(object):
     levels2a = {"!":"E", "+":"W", "=":"D", "-":"I",
                 "E":"E", "W":"W", "D":"D", "I":"I"}
     
-    def __init__(self, filename, queue, timefmt="%Y-%d-%m %X", level="="):
+    def __init__(self, filename, queue, timefmt="%Y-%d-%m %X", level="=", bollback=None):
+        """
+        @param bollback: 日志切割方式 None-不切割;(10, 3)-每个10M(单位为M),保留最近3个文件;("D", 7)-每天一个文件,保留最近10天
+        """
         self.filename = filename
+        self.dirname = os.path.dirname(filename)
+        self.basename = os.path.basename(filename)
         self.queue = queue
         self.timefmt = timefmt
         self.sys_level_value = self.levels[self.levels2a.get(level, "D")]
+        self.bollback = bollback # 日志分割方式(None, (10, 3), "D")
+        self.countfile = 0
         self.gth_loop = gevent.spawn(self.loop)
+        self.gth_boll = gevent.spawn(self.incise)
         
     def loop(self):
         while True:
@@ -73,20 +82,55 @@ class LogManager(object):
             else: continue
             if level_value < self.sys_level_value: continue
             prefix = "[{0}][{1}] ".format(msg_level, time.strftime(self.timefmt))
-            with open(self.filename, "a+") as f:
+            filename = self.filename
+            if isinstance(self.bollback,tuple) and len(self.bollback)==2 and self.bollback[0]=="D":
+                filename = self.filename + ".%s"%time.strftime("%Y-%m-%d")
+            with open(filename, "a+") as f:
                 if msg_level != "-" and len(msg) > 1:
                     msg = msg[1:]
                     msg = msg.lstrip(" ")
                 line = prefix + msg + "\n"
                 f.write(line)
+    
+    def incise(self):
+        if not self.bollback: return
+        if not (isinstance(self.bollback, tuple) and len(self.bollback)!=2): return
+        value, count = self.bollback
+        self.countfile = count
+        while True:
+            if isinstance(value, int):
+                self.incise_size(value, count)
+                gevent.sleep(60)
+            if isinstance(value, str):
+                self.incise_date(value, count)
+                gevent.sleep(60*60)
+    
+    def incise_size(self, megasize, count):
+        size = megasize * 1024 * 1024
+        filesize = getsize(self.filename)
+        if filesize >= size:
+            if self.countfile == 0:
+                os.remove(self.filename+".%s"%count)
+                self.countfile = count
+            newfile = self.filename+".%s"%(self.countfile)
+            self.countfile -= 1
+            shutil.move(self.filename, newfile) # 重命名文件
+            with open(self.filename, "w") as f: f.write("") # 新建一个空文件
+    
+    def incise_date(self, fmt, count):
+        listfile = [f for f in os.listdir(self.dirname) if f.startswith(self.basename+".")]
+        listfile.sort(reverse=True)
+        spare = listfile[count:]
+        if spare:
+            map(os.remove, spare)
+        
                 
-                
-def start_logging(filename=None, timefmt="%Y-%d-%m %X", level="=", encoding=None):
+def start_logging(filename=None, timefmt="%Y-%d-%m %X", level="=", encoding=None, bollback=None):
     """全局函数,启动日志"""
     if not filename: return "sys.stdout"
     queue = Queue()
     stdout = Stdio(queue=queue, encoding=encoding)
-    manager = LogManager(filename, queue, timefmt, level)
+    manager = LogManager(filename, queue, timefmt, level, bollback)
     sys.stdout = stdout
     return filename
 
