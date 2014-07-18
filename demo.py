@@ -3,7 +3,7 @@
 from log import start_logging
 import gevent
 
-start_logging("test.log", timefmt="%Y-%d-%m %X")
+start_logging("test.log", "%Y-%d-%m %X", level="+")
 
 print "!", "abcdef", "12345"
 print "+ghighk", "34343"
