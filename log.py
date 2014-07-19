@@ -83,7 +83,7 @@ class LogManager(object):
             if level_value < self.sys_level_value: continue
             prefix = "[{0}][{1}] ".format(msg_level, time.strftime(self.timefmt))
             filename = self.filename
-            if isinstance(self.bollback,tuple) and len(self.bollback)==2 and self.bollback[0]=="D":
+            if isinstance(self.bollback,tuple) and self.bollback[0]=="D":
                 filename = self.filename + ".%s"%time.strftime("%Y-%m-%d")
             with open(filename, "a+") as f:
                 if msg_level != "-" and len(msg) > 1:
