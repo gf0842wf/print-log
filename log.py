@@ -59,7 +59,8 @@ class LogManager(object):
     
     def __init__(self, filename, queue, timefmt="%Y-%d-%m %X", level="=", bollback=None):
         """
-        @param bollback: 日志切割方式 None-不切割;(10, 3)-每个10M(单位为M),保留最近3个文件;("D", 7)-每天一个文件,保留最近10天
+        @param bollback: 日志切割方式 None-不切割;(10, 3)-每个10M(单位为M),保留最近3个文件;("D", 10)-每天一个文件,保留最近10天
+        : 重要: 建议只使用按天分割日志方式
         """
         self.filename = filename
         self.dirname = os.path.dirname(filename)
@@ -81,9 +82,9 @@ class LogManager(object):
                 level_value = self.levels.get(msg_level)
             else: continue
             if level_value < self.sys_level_value: continue
-            prefix = "[{0}][{1}] ".format(msg_level, time.strftime(self.timefmt))
+            prefix = "[{0}][{1}] "%(msg_level, time.strftime(self.timefmt))
             filename = self.filename
-            if isinstance(self.bollback,tuple) and self.bollback[0]=="D":
+            if self.bollback and self.bollback[0]=="D":
                 filename = self.filename + ".%s"%time.strftime("%Y-%m-%d")
             with open(filename, "a+") as f:
                 if msg_level != "-" and len(msg) > 1:
