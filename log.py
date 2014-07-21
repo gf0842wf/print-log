@@ -57,6 +57,8 @@ class LogManager(object):
     levels2a = {"!":"E", "+":"W", "=":"D", "-":"I",
                 "E":"E", "W":"W", "D":"D", "I":"I"}
     
+    buf = [] # TODO: 定时刷新到文件,而不是来一条,打开文件然后写入
+    
     def __init__(self, filename, queue, timefmt="%Y-%d-%m %X", level="=", bollback=None):
         """
         @param bollback: 日志切割方式 None-不切割;(10, 3)-每个10M(单位为M),保留最近3个文件;("D", 10)-每天一个文件,保留最近10天
@@ -82,15 +84,19 @@ class LogManager(object):
                 level_value = self.levels.get(msg_level)
             else: continue
             if level_value < self.sys_level_value: continue
+            
             prefix = "[{0}][{1}] "%(msg_level, time.strftime(self.timefmt))
-            filename = self.filename
+            
             if self.bollback and self.bollback[0]=="D":
                 filename = self.filename + ".%s"%time.strftime("%Y-%m-%d")
+            else:
+                filename = self.filename
+                
+            if msg_level != "-" and len(msg) > 1:
+                msg = msg[1:]
+                msg = msg.lstrip(" ")
+            line = prefix + msg + "\n"
             with open(filename, "a+") as f:
-                if msg_level != "-" and len(msg) > 1:
-                    msg = msg[1:]
-                    msg = msg.lstrip(" ")
-                line = prefix + msg + "\n"
                 f.write(line)
     
     def incise(self):
@@ -104,7 +110,7 @@ class LogManager(object):
                 gevent.sleep(60)
             if isinstance(value, str):
                 self.incise_date(value, count)
-                gevent.sleep(60*60)
+                gevent.sleep(60*60*2) # 两小时检查一次
     
     def incise_size(self, megasize, count):
         size = megasize * 1024 * 1024
