@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from gevent.queue import Queue
-from os.path import getsize
-import sys, time, os, shutil
 import gevent
+import sys, time, os
 
 
 class Stdio(object):
@@ -53,15 +52,14 @@ class LogManager(object):
     """gevent的log循环"""
     # 级别: Error, Warn, Debug, Info
     # 默认是Debug级别
-    levels = {"E":4, "W":3, "D":2, "I":1, "-":2}
-    levels2a = {"!":"E", "+":"W", "=":"D", "-":"I",
-                "E":"E", "W":"W", "D":"D", "I":"I"}
+    levels = {"!":4, "+":3, "=":2, "-":1}
+    levels2a = {"!":"E", "+":"W", "=":"D", "-":"I"}
     
     buf = [] # TODO: 定时刷新到文件,而不是来一条,打开文件然后写入
     
     def __init__(self, filename, queue, timefmt="%Y-%d-%m %X", level="=", bollback=None):
         """
-        @param bollback: 日志切割方式 None-不切割;(10, 3)-每个10M(单位为M),保留最近3个文件;("D", 10)-每天一个文件,保留最近10天
+        @param bollback: 日志切割方式None-不切割;("D", 10)-每天一个文件,保留最近10天
         : 重要: 建议只使用按天分割日志方式
         """
         self.filename = filename
@@ -69,67 +67,50 @@ class LogManager(object):
         self.basename = os.path.basename(filename)
         self.queue = queue
         self.timefmt = timefmt
-        self.sys_level_value = self.levels[self.levels2a.get(level, "D")]
-        self.bollback = bollback # 日志分割方式(None, (10, 3), "D")
-        self.countfile = 0
+        self.sys_level_value = self.levels[level]
+        self.bollback = bollback # 日志分割方式 None, (10, 3), ("D", 10)
         self.gth_loop = gevent.spawn(self.loop)
         self.gth_boll = gevent.spawn(self.incise)
         
     def loop(self):
         while True:
             msg = self.queue.get()
-            if msg:
-                msg_level = msg[0]
-                msg_level = self.levels2a.get(msg_level, "-")
-                level_value = self.levels.get(msg_level)
-            else: continue
+            if not msg: continue
+            
+            msg_level = msg[0]
+            if msg_level not in self.levels:
+                msg_level = "="
+            else:
+                msg = msg[1:]
+            
+            if not msg: continue
+            
+            level_value = self.levels.get(msg_level)
             if level_value < self.sys_level_value: continue
             
-            prefix = "[{0}][{1}] "%(msg_level, time.strftime(self.timefmt))
+            prefix = "[%s][%s] "%(self.levels2a[msg_level], time.strftime(self.timefmt))
             
-            if self.bollback and self.bollback[0]=="D":
+            if self.bollback[0]=="D":
                 filename = self.filename + ".%s"%time.strftime("%Y-%m-%d")
             else:
                 filename = self.filename
                 
-            if msg_level != "-" and len(msg) > 1:
-                msg = msg[1:]
-                msg = msg.lstrip(" ")
             line = prefix + msg + "\n"
             with open(filename, "a+") as f:
                 f.write(line)
     
     def incise(self):
-        if not self.bollback: return
-        if not (isinstance(self.bollback, tuple) and len(self.bollback)!=2): return
-        value, count = self.bollback
-        self.countfile = count
+        if self.bollback == None: return
+        kind, count = self.bollback
         while True:
-            if isinstance(value, int):
-                self.incise_size(value, count)
-                gevent.sleep(60)
-            if isinstance(value, str):
-                self.incise_date(value, count)
-                gevent.sleep(60*60*2) # 两小时检查一次
+            self.incise_date(kind, count)
+            gevent.sleep(60*60*6) # 6小时检查一次
     
-    def incise_size(self, megasize, count):
-        size = megasize * 1024 * 1024
-        filesize = getsize(self.filename)
-        if filesize >= size:
-            if self.countfile == 0:
-                os.remove(self.filename+".%s"%count)
-                self.countfile = count
-            newfile = self.filename+".%s"%(self.countfile)
-            self.countfile -= 1
-            shutil.move(self.filename, newfile) # 重命名文件
-            with open(self.filename, "w") as f: f.write("") # 新建一个空文件
-    
-    def incise_date(self, fmt, count):
+    def incise_date(self, kind, count):
         listfile = [f for f in os.listdir(self.dirname) if f.startswith(self.basename+".")]
         listfile.sort(reverse=True)
         spare = listfile[count:]
-        if spare:
-            map(os.remove, spare)
+        if spare: map(lambda f:os.remove(self.dirname+f), spare)
         
                 
 def start_logging(filename=None, timefmt="%Y-%d-%m %X", level="=", encoding=None, bollback=None):
@@ -142,14 +123,11 @@ def start_logging(filename=None, timefmt="%Y-%d-%m %X", level="=", encoding=None
     return filename
 
 if __name__ == "__main__":
-    start_logging("test.log")
+    start_logging("./test.log")
     
     while True:
         print "!", "abcdef", "12345"
         print "+ghighk", "34343"
-        print "Dhahaha", "67676"
-        print "I", "ooxxx", "88989"
-        print "xyzufo", "88989"
         gevent.sleep(2)
             
     gevent.wait()
